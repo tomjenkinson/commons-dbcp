@@ -154,4 +154,8 @@ public class TransactionContext {
         }
         return transaction;
     }
+
+    public String toString() {
+        return super.toString() + " " + transactionRef;
+    }
 }

@@ -57,21 +57,28 @@ public class ManagedConnection<C extends Connection> extends DelegatingConnectio
         this.pool = pool;
         this.transactionRegistry = transactionRegistry;
         this.accessToUnderlyingConnectionAllowed = accessToUnderlyingConnectionAllowed;
-        updateTransactionStatus();
+        updateTransactionStatus(true);
+    }
+
+
+    protected void checkOpenWarnings() throws SQLException {
+        super.checkOpen();
+        updateTransactionStatus(false);
     }
 
     @Override
     protected void checkOpen() throws SQLException {
         super.checkOpen();
-        updateTransactionStatus();
+        updateTransactionStatus(true);
     }
 
-    private void updateTransactionStatus() throws SQLException {
+    private void updateTransactionStatus(boolean recreateAConnection) throws SQLException {
         // if there is a is an active transaction context, assure the transaction context hasn't changed
         if (transactionContext != null) {
             if (transactionContext.isActive()) {
-                if (transactionContext != transactionRegistry.getActiveTransactionContext()) {
-                    throw new SQLException("Connection can not be used while enlisted in another transaction");
+                TransactionContext activeTransactionContext = transactionRegistry.getActiveTransactionContext();
+                if (transactionContext != activeTransactionContext) {
+                    throw new SQLException("Connection can not be used while enlisted in another transaction: " + transactionContext + " " + activeTransactionContext);
                 }
                 return;
             }
@@ -120,6 +127,7 @@ public class ManagedConnection<C extends Connection> extends DelegatingConnectio
             isSharedConnection = true;
         } else {
             C connection = getDelegateInternal();
+            if (recreateAConnection)
             // if our delegate is null, create one
             if (connection == null) {
                 try {
