@@ -24,7 +24,9 @@ import javax.sql.XAConnection;
 import javax.sql.XADataSource;
 import javax.transaction.TransactionManager;
 import javax.transaction.TransactionSynchronizationRegistry;
+import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
+import javax.transaction.xa.Xid;
 
 import org.apache.commons.dbcp2.Utils;
 
@@ -149,7 +151,60 @@ public class DataSourceXAConnectionFactory implements XAConnectionFactory {
 
         // get the real connection and XAResource from the connection
         final Connection connection = xaConnection.getConnection();
-        final XAResource xaResource = xaConnection.getXAResource();
+        final XAResource internalXAR = xaConnection.getXAResource();
+
+        // Wrap the XAResource from the database with a method to override isSameRM
+        final XAResource xaResource = new XAResource() {
+            @Override
+            public void commit(Xid xid, boolean b) throws XAException {
+                internalXAR.commit(xid, b);
+            }
+
+            @Override
+            public void end(Xid xid, int i) throws XAException {
+                internalXAR.end(xid, i);
+            }
+
+            @Override
+            public void forget(Xid xid) throws XAException {
+                internalXAR.forget(xid);
+            }
+
+            @Override
+            public int getTransactionTimeout() throws XAException {
+                return internalXAR.getTransactionTimeout();
+            }
+
+            @Override
+            public boolean isSameRM(XAResource xaResource) throws XAException {
+                return false;
+            }
+
+            @Override
+            public int prepare(Xid xid) throws XAException {
+                return internalXAR.prepare(xid);
+            }
+
+            @Override
+            public Xid[] recover(int i) throws XAException {
+                return internalXAR.recover(i);
+            }
+
+            @Override
+            public void rollback(Xid xid) throws XAException {
+                internalXAR.rollback(xid);
+            }
+
+            @Override
+            public boolean setTransactionTimeout(int i) throws XAException {
+                return internalXAR.setTransactionTimeout(i);
+            }
+
+            @Override
+            public void start(Xid xid, int i) throws XAException {
+                internalXAR.start(xid, i);
+            }
+        };
 
         // register the xa resource for the connection
         transactionRegistry.registerConnection(connection, xaResource);
